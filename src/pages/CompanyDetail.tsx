@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Download, FileText, Video, Link as LinkIcon, Bookmark, BookmarkCheck, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import ResourceViewer from "@/components/ResourceViewer";
 import { format } from "date-fns";
 
 const CompanyDetail = () => {
@@ -19,6 +20,8 @@ const CompanyDetail = () => {
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedRound, setSelectedRound] = useState<string>("all");
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerResource, setViewerResource] = useState<any | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -97,20 +100,48 @@ const CompanyDetail = () => {
   };
 
   const handleDownload = async (resource: any) => {
+    // Track download event
+    await supabase.from("resource_analytics").insert({
+      resource_id: resource.id,
+      user_id: user?.id,
+      action: "download",
+    });
+
     // Increment download count
     await supabase
       .from("resources")
       .update({ download_count: (resource.download_count || 0) + 1 })
       .eq("id", resource.id);
-    
-    if (resource.file_path) {
-      const { data } = supabase.storage.from("resources").getPublicUrl(resource.file_path);
-      window.open(data.publicUrl, "_blank");
-    } else if (resource.external_link) {
+
+    // Open link
+    if (resource.external_link) {
       window.open(resource.external_link, "_blank");
+    } else if (resource.file_path) {
+      const { data } = await supabase.storage
+        .from("resources")
+        .createSignedUrl(resource.file_path, 60);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      }
     }
-    
     toast.success("Opening resource...");
+  };
+
+  const handleViewInSite = async (resource: any) => {
+    // Track view event
+    await supabase.from("resource_analytics").insert({
+      resource_id: resource.id,
+      user_id: user?.id,
+      action: "view",
+    });
+
+    // Increment view count (if column exists)
+    await supabase
+      .from("resources")
+      .update({ view_count: (resource.view_count || 0) + 1 })
+      .eq("id", resource.id);
+    setViewerResource(resource);
+    setViewerOpen(true);
   };
 
   const getResourceIcon = (type: string) => {
@@ -165,6 +196,7 @@ const CompanyDetail = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <Navbar />
       
@@ -206,7 +238,7 @@ const CompanyDetail = () => {
                             {getResourceIcon(resource.resource_type)}
                             <CardTitle className="text-xl">{resource.title}</CardTitle>
                           </div>
-                          <CardDescription>{resource.description}</CardDescription>
+                          <CardDescription className="text-justify">{resource.description}</CardDescription>
                           <div className="flex items-center gap-2 mt-3">
                             <Badge variant="outline" className="capitalize">
                               {resource.round_type}
@@ -222,7 +254,7 @@ const CompanyDetail = () => {
                             Uploaded by {resource.profiles?.full_name || "Mentor"} • {format(new Date(resource.created_at), "MMM dd, yyyy")}
                           </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -234,7 +266,10 @@ const CompanyDetail = () => {
                               <Bookmark className="h-5 w-5" />
                             )}
                           </Button>
-                          <Button onClick={() => handleDownload(resource)} className="gap-2">
+                          <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewInSite(resource)}>
+                            Preview
+                          </Button>
+                          <Button onClick={() => handleDownload(resource)} className="gap-2 w-full sm:w-auto">
                             <Download className="h-4 w-4" />
                             Open
                           </Button>
@@ -261,6 +296,8 @@ const CompanyDetail = () => {
         </div>
       </div>
     </div>
+    <ResourceViewer resource={viewerResource} open={viewerOpen} onOpenChange={setViewerOpen} />
+    </>
   );
 };
 

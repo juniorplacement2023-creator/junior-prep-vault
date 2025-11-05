@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Search, TrendingUp, BookOpen, Users, ArrowRight, Pin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [featuredCompanies, setFeaturedCompanies] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -61,7 +62,7 @@ const Index = () => {
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      window.location.href = `/companies?search=${encodeURIComponent(searchQuery)}`;
+      navigate(`/companies?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -125,7 +126,7 @@ const Index = () => {
                           {announcement.is_pinned && <Pin className="h-4 w-4 text-primary" />}
                           {announcement.title}
                         </CardTitle>
-                        <CardDescription className="mt-2">
+                        <CardDescription className="mt-2 text-justify">
                           {announcement.content}
                         </CardDescription>
                       </div>

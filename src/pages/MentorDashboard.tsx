@@ -25,7 +25,8 @@ const MentorDashboard = () => {
     totalViews: 0,
     totalBookmarks: 0,
     topResources: [],
-    recentActivity: []
+    recentActivity: [],
+    downloadsByResource: {}
   });
   const [uploading, setUploading] = useState(false);
 
@@ -87,33 +88,51 @@ const MentorDashboard = () => {
     // Get download stats
     const { data: downloadData } = await supabase
       .from("resource_analytics")
-      .select("*")
+      .select("id")
       .eq("action", "download");
 
     // Get view stats
     const { data: viewData } = await supabase
       .from("resource_analytics")
-      .select("*")
+      .select("id")
       .eq("action", "view");
 
     // Get bookmark stats
     const { data: bookmarkData } = await supabase
       .from("bookmarks")
-      .select("*");
+      .select("id");
 
-    // Get top resources by downloads
-    const { data: topResources } = await supabase
+    // Build top resources by effective download count (analytics-based, fallback to resource.download_count)
+    const { data: downloadRows } = await supabase
+      .from("resource_analytics")
+      .select("resource_id")
+      .eq("action", "download");
+
+    const downloadCountByResource: Record<string, number> = {};
+    (downloadRows || []).forEach((r: any) => {
+      const key = r.resource_id as string;
+      downloadCountByResource[key] = (downloadCountByResource[key] || 0) + 1;
+    });
+
+    const { data: allResources } = await supabase
       .from("resources")
-      .select("*, companies(name)")
-      .order("download_count", { ascending: false })
-      .limit(5);
+      .select("id, title, round_type, download_count, companies(name)");
+
+    const sortedTop = (allResources || [])
+      .map((r: any) => ({
+        ...r,
+        derived_downloads: downloadCountByResource[r.id] ?? r.download_count ?? 0,
+      }))
+      .sort((a: any, b: any) => (b.derived_downloads || 0) - (a.derived_downloads || 0))
+      .slice(0, 5);
 
     setAnalytics({
       totalResources: totalResources || 0,
       totalDownloads: downloadData?.length || 0,
       totalViews: viewData?.length || 0,
       totalBookmarks: bookmarkData?.length || 0,
-      topResources: topResources || [],
+      topResources: sortedTop || [],
+      downloadsByResource: downloadCountByResource,
     });
   };
 
@@ -283,14 +302,16 @@ const MentorDashboard = () => {
           <h1 className="text-3xl md:text-4xl font-bold mb-8">Mentor Dashboard</h1>
 
           <Tabs defaultValue="analytics" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 gap-2">
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              <TabsTrigger value="upload">Upload</TabsTrigger>
-              <TabsTrigger value="resources">Resources</TabsTrigger>
-              <TabsTrigger value="companies">Companies</TabsTrigger>
-              <TabsTrigger value="announcements">Announcements</TabsTrigger>
-              <TabsTrigger value="manage-announcements">Manage</TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto pb-2 -mx-1 md:mx-0">
+              <TabsList className="flex w-max md:w-full md:grid md:grid-cols-6 gap-2">
+                <TabsTrigger className="shrink-0" value="analytics">Analytics</TabsTrigger>
+                <TabsTrigger className="shrink-0" value="upload">Upload</TabsTrigger>
+                <TabsTrigger className="shrink-0" value="resources">Resources</TabsTrigger>
+                <TabsTrigger className="shrink-0" value="companies">Companies</TabsTrigger>
+                <TabsTrigger className="shrink-0" value="announcements">Announcements</TabsTrigger>
+                <TabsTrigger className="shrink-0" value="manage-announcements">Manage</TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="analytics" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -367,7 +388,7 @@ const MentorDashboard = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold">{resource.download_count || 0}</p>
+                            <p className="font-semibold">{(resource as any).derived_downloads ?? resource.download_count ?? 0}</p>
                             <p className="text-xs text-muted-foreground">downloads</p>
                           </div>
                         </div>
@@ -533,7 +554,7 @@ const MentorDashboard = () => {
                                 {resource.folder_path && ` • ${resource.folder_path}`}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Downloads: {resource.download_count || 0}
+                                Downloads: {analytics.downloadsByResource?.[resource.id] ?? resource.download_count ?? 0}
                               </p>
                             </div>
                           </div>
@@ -680,7 +701,7 @@ const MentorDashboard = () => {
                                 <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Pinned</span>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground">{announcement.content}</p>
+                            <p className="text-sm text-muted-foreground text-justify">{announcement.content}</p>
                             <p className="text-xs text-muted-foreground mt-2">
                               {new Date(announcement.created_at).toLocaleDateString()}
                             </p>

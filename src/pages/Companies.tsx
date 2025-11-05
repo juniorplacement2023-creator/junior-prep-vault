@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link, useSearchParams } from "react-router-dom";
 
 const Companies = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
@@ -16,6 +16,10 @@ const Companies = () => {
   useEffect(() => {
     fetchCompanies();
   }, []);
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get("search") || "");
+  }, [searchParams]);
 
   const fetchCompanies = async () => {
     setLoading(true);
@@ -49,9 +53,18 @@ const Companies = () => {
                 placeholder="Search companies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setSearchParams(searchQuery ? { search: searchQuery } : {});
+                  }
+                }}
                 className="h-11"
               />
-              <Button variant="outline" size="lg">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setSearchParams(searchQuery ? { search: searchQuery } : {})}
+              >
                 <Search className="h-4 w-4" />
               </Button>
             </div>

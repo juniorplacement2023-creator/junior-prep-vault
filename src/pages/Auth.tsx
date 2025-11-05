@@ -130,9 +130,33 @@ const Auth = () => {
 
     if (error) {
       toast.error(error.message);
-    } else {
+      return;
+    }
+
+    // Verify role after successful sign-in
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      toast.error("Unable to verify user. Please try again.");
+      return;
+    }
+
+    const { data: roleData, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
+
+    if (roleError) {
+      toast.error("Could not verify mentor role.");
+      return;
+    }
+
+    if (roleData?.role === "mentor" || roleData?.role === "admin") {
       toast.success("Signed in as mentor!");
       navigate("/mentor/dashboard");
+    } else {
+      toast.error("This account is not assigned a mentor role.");
     }
   };
 

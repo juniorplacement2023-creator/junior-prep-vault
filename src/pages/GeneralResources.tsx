@@ -6,6 +6,7 @@ import { Folder, FileText, Download, ExternalLink, Bookmark } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import ResourceViewer from "@/components/ResourceViewer";
 
 interface FolderStructure {
   [key: string]: any[];
@@ -17,6 +18,8 @@ const GeneralResources = () => {
   const [folders, setFolders] = useState<FolderStructure>({});
   const [currentPath, setCurrentPath] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerResource, setViewerResource] = useState<any | null>(null);
 
   useEffect(() => {
     fetchGeneralResources();
@@ -78,6 +81,20 @@ const GeneralResources = () => {
     }
   };
 
+  const handleViewInSite = async (resource: any) => {
+    await supabase.from("resource_analytics").insert({
+      resource_id: resource.id,
+      user_id: user?.id,
+      action: "view",
+    });
+    await supabase
+      .from("resources")
+      .update({ view_count: (resource.view_count || 0) + 1 })
+      .eq("id", resource.id);
+    setViewerResource(resource);
+    setViewerOpen(true);
+  };
+
   const handleBookmark = async (resourceId: string) => {
     if (!user) {
       toast.error("Please sign in to bookmark resources");
@@ -124,6 +141,7 @@ const GeneralResources = () => {
   const currentResources = folders[currentPath || "root"] || [];
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <Navbar />
       
@@ -189,7 +207,7 @@ const GeneralResources = () => {
                           <FileText className="h-5 w-5 text-primary" />
                           {resource.title}
                         </CardTitle>
-                        <CardDescription className="mt-2">
+                        <CardDescription className="mt-2 text-justify">
                           {resource.description}
                         </CardDescription>
                         <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
@@ -203,10 +221,10 @@ const GeneralResources = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => handleDownload(resource)}
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                       >
                         {resource.external_link ? (
                           <>
@@ -222,8 +240,15 @@ const GeneralResources = () => {
                       </Button>
                       <Button
                         variant="outline"
+                        onClick={() => handleViewInSite(resource)}
+                        className="w-full sm:w-auto"
+                      >
+                        Preview
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => handleBookmark(resource.id)}
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                       >
                         <Bookmark className="h-4 w-4" />
                         Bookmark
@@ -246,6 +271,8 @@ const GeneralResources = () => {
         </div>
       </div>
     </div>
+    <ResourceViewer resource={viewerResource} open={viewerOpen} onOpenChange={setViewerOpen} />
+    </>
   );
 };
 
