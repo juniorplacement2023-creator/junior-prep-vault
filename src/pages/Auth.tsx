@@ -95,10 +95,38 @@ const Auth = () => {
 
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("Signed in successfully!");
-      navigate("/");
+      return;
     }
+
+    // Post-login role guard: block mentors/admins from using student sign-in
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      toast.error("Unable to verify user. Please try again.");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    const { data: roleData, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
+
+    if (roleError) {
+      toast.error("Could not verify role. Please try again.");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    if (roleData?.role === "mentor" || roleData?.role === "admin") {
+      toast.error("Mentors must sign in using the Mentor tab.");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    toast.success("Signed in successfully!");
+    navigate("/");
   };
 
   const handleMentorSignIn = async (e: React.FormEvent) => {
