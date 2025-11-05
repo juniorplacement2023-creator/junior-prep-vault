@@ -40,6 +40,11 @@ export const Navbar = () => {
                 Companies
               </Button>
             </Link>
+            <Link to="/forum">
+              <Button variant="ghost" size="sm">
+                Forum
+              </Button>
+            </Link>
             <Link to="/general-resources">
               <Button variant="ghost" size="sm">
                 General Resources
@@ -111,6 +116,11 @@ export const Navbar = () => {
                     <Button variant="ghost" className="justify-start">
                       <Building2 className="h-4 w-4 mr-2" />
                       Companies
+                    </Button>
+                  </Link>
+                  <Link to="/forum">
+                    <Button variant="ghost" className="justify-start">
+                      Forum
                     </Button>
                   </Link>
                   <Link to="/general-resources">

@@ -12,6 +12,7 @@ import MentorDashboard from "./pages/MentorDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import GeneralResources from "./pages/GeneralResources";
 import Profile from "./pages/Profile";
+import Forum from "./pages/Forum";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/company/:id" element={<CompanyDetail />} />
             <Route path="/general-resources" element={<GeneralResources />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/forum" element={<Forum />} />
             <Route path="/mentor/dashboard" element={<MentorDashboard />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
