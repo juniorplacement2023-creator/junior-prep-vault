@@ -142,14 +142,48 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_analytics: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          resource_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          resource_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          resource_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_analytics_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resources: {
         Row: {
-          company_id: string
+          category: Database["public"]["Enums"]["resource_category"] | null
+          company_id: string | null
           created_at: string | null
           description: string | null
           download_count: number | null
           external_link: string | null
           file_path: string | null
+          folder_path: string | null
           id: string
           resource_type: Database["public"]["Enums"]["resource_type"]
           round_type: Database["public"]["Enums"]["round_type"]
@@ -158,12 +192,14 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
-          company_id: string
+          category?: Database["public"]["Enums"]["resource_category"] | null
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           download_count?: number | null
           external_link?: string | null
           file_path?: string | null
+          folder_path?: string | null
           id?: string
           resource_type: Database["public"]["Enums"]["resource_type"]
           round_type: Database["public"]["Enums"]["round_type"]
@@ -172,12 +208,14 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
-          company_id?: string
+          category?: Database["public"]["Enums"]["resource_category"] | null
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           download_count?: number | null
           external_link?: string | null
           file_path?: string | null
+          folder_path?: string | null
           id?: string
           resource_type?: Database["public"]["Enums"]["resource_type"]
           round_type?: Database["public"]["Enums"]["round_type"]
@@ -246,6 +284,15 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "mentor" | "junior"
+      resource_category:
+        | "aptitude"
+        | "coding"
+        | "technical"
+        | "hr"
+        | "general"
+        | "communication"
+        | "resume"
+        | "other"
       resource_type: "pdf" | "doc" | "video" | "link" | "other"
       round_type: "aptitude" | "coding" | "technical" | "hr" | "general"
     }
@@ -376,6 +423,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "mentor", "junior"],
+      resource_category: [
+        "aptitude",
+        "coding",
+        "technical",
+        "hr",
+        "general",
+        "communication",
+        "resume",
+        "other",
+      ],
       resource_type: ["pdf", "doc", "video", "link", "other"],
       round_type: ["aptitude", "coding", "technical", "hr", "general"],
     },

@@ -38,6 +38,11 @@ export const Navbar = () => {
                 Companies
               </Button>
             </Link>
+            <Link to="/general-resources">
+              <Button variant="ghost" size="sm">
+                General Resources
+              </Button>
+            </Link>
 
             {user ? (
               <DropdownMenu>

@@ -8,27 +8,37 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Upload, Plus, FileText, Trash2 } from "lucide-react";
+import { Upload, Plus, FileText, Trash2, Building2, BarChart3, TrendingUp, Download, Eye, Bookmark, Folder, FolderPlus } from "lucide-react";
 
 const MentorDashboard = () => {
   const { user, userRole, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>({
+    totalResources: 0,
+    totalDownloads: 0,
+    totalViews: 0,
+    totalBookmarks: 0,
+    topResources: [],
+    recentActivity: []
+  });
   const [uploading, setUploading] = useState(false);
 
   // Form states
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newCompanyDesc, setNewCompanyDesc] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState<string>("general");
   const [resourceTitle, setResourceTitle] = useState("");
   const [resourceDesc, setResourceDesc] = useState("");
   const [resourceType, setResourceType] = useState("pdf");
   const [roundType, setRoundType] = useState("aptitude");
+  const [category, setCategory] = useState("general");
+  const [folderPath, setFolderPath] = useState("");
   const [externalLink, setExternalLink] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
@@ -47,6 +57,7 @@ const MentorDashboard = () => {
   useEffect(() => {
     if (user && (userRole === "mentor" || userRole === "admin")) {
       fetchData();
+      fetchAnalytics();
     }
   }, [user, userRole]);
 
@@ -55,11 +66,55 @@ const MentorDashboard = () => {
     const { data: resourcesData } = await supabase
       .from("resources")
       .select("*, companies(name)")
-      .eq("uploaded_by", user?.id)
+      .order("created_at", { ascending: false });
+
+    const { data: announcementsData } = await supabase
+      .from("announcements")
+      .select("*")
       .order("created_at", { ascending: false });
 
     setCompanies(companiesData || []);
     setResources(resourcesData || []);
+    setAnnouncements(announcementsData || []);
+  };
+
+  const fetchAnalytics = async () => {
+    // Get total resources count
+    const { count: totalResources } = await supabase
+      .from("resources")
+      .select("*", { count: "exact", head: true });
+
+    // Get download stats
+    const { data: downloadData } = await supabase
+      .from("resource_analytics")
+      .select("*")
+      .eq("action", "download");
+
+    // Get view stats
+    const { data: viewData } = await supabase
+      .from("resource_analytics")
+      .select("*")
+      .eq("action", "view");
+
+    // Get bookmark stats
+    const { data: bookmarkData } = await supabase
+      .from("bookmarks")
+      .select("*");
+
+    // Get top resources by downloads
+    const { data: topResources } = await supabase
+      .from("resources")
+      .select("*, companies(name)")
+      .order("download_count", { ascending: false })
+      .limit(5);
+
+    setAnalytics({
+      totalResources: totalResources || 0,
+      totalDownloads: downloadData?.length || 0,
+      totalViews: viewData?.length || 0,
+      totalBookmarks: bookmarkData?.length || 0,
+      topResources: topResources || [],
+    });
   };
 
   const handleAddCompany = async () => {
@@ -70,7 +125,7 @@ const MentorDashboard = () => {
 
     const { error } = await supabase
       .from("companies")
-      .insert({ name: newCompanyName, description: newCompanyDesc });
+      .insert({ name: newCompanyName, description: newCompanyDesc, is_featured: true });
 
     if (error) {
       toast.error("Failed to add company");
@@ -82,9 +137,27 @@ const MentorDashboard = () => {
     }
   };
 
+  const handleDeleteCompany = async (id: string) => {
+    if (!confirm("Are you sure? This will delete all resources for this company.")) return;
+    
+    const { error } = await supabase.from("companies").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Failed to delete company");
+    } else {
+      toast.success("Company deleted");
+      fetchData();
+    }
+  };
+
   const handleUploadResource = async () => {
-    if (!selectedCompany || !resourceTitle.trim()) {
-      toast.error("Please fill in all required fields");
+    if (!resourceTitle.trim()) {
+      toast.error("Please fill in the title");
+      return;
+    }
+
+    if (selectedCompany !== "general" && !selectedCompany) {
+      toast.error("Please select a company or choose General Resources");
       return;
     }
 
@@ -113,11 +186,13 @@ const MentorDashboard = () => {
 
       // Insert resource record
       const { error } = await supabase.from("resources").insert({
-        company_id: selectedCompany,
+        company_id: selectedCompany === "general" ? null : selectedCompany,
         title: resourceTitle,
         description: resourceDesc,
         resource_type: resourceType as any,
         round_type: roundType as any,
+        category: category as any,
+        folder_path: selectedCompany === "general" ? folderPath : null,
         file_path: filePath,
         external_link: externalLink || null,
         uploaded_by: user?.id,
@@ -128,13 +203,15 @@ const MentorDashboard = () => {
       toast.success("Resource uploaded successfully");
       
       // Reset form
-      setSelectedCompany("");
+      setSelectedCompany("general");
       setResourceTitle("");
       setResourceDesc("");
       setExternalLink("");
       setFile(null);
+      setFolderPath("");
       
       fetchData();
+      fetchAnalytics();
     } catch (error: any) {
       toast.error(error.message || "Failed to upload resource");
     } finally {
@@ -143,6 +220,8 @@ const MentorDashboard = () => {
   };
 
   const handleDeleteResource = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this resource?")) return;
+
     const { error } = await supabase.from("resources").delete().eq("id", id);
 
     if (error) {
@@ -150,6 +229,7 @@ const MentorDashboard = () => {
     } else {
       toast.success("Resource deleted");
       fetchData();
+      fetchAnalytics();
     }
   };
 
@@ -173,28 +253,132 @@ const MentorDashboard = () => {
       setAnnouncementTitle("");
       setAnnouncementContent("");
       setIsPinned(false);
+      fetchData();
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this announcement?")) return;
+
+    const { error } = await supabase.from("announcements").delete().eq("id", id);
+
+    if (error) {
+      toast.error("Failed to delete announcement");
+    } else {
+      toast.success("Announcement deleted");
+      fetchData();
     }
   };
 
   if (authLoading) {
-    return <div>Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <Navbar />
       
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-4xl font-bold mb-8">Mentor Dashboard</h1>
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl md:text-4xl font-bold mb-8">Mentor Dashboard</h1>
 
-          <Tabs defaultValue="upload">
-            <TabsList className="mb-6">
-              <TabsTrigger value="upload">Upload Resources</TabsTrigger>
-              <TabsTrigger value="my-resources">My Resources</TabsTrigger>
-              <TabsTrigger value="companies">Manage Companies</TabsTrigger>
-              <TabsTrigger value="announcements">Post Announcement</TabsTrigger>
+          <Tabs defaultValue="analytics" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 gap-2">
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="upload">Upload</TabsTrigger>
+              <TabsTrigger value="resources">Resources</TabsTrigger>
+              <TabsTrigger value="companies">Companies</TabsTrigger>
+              <TabsTrigger value="announcements">Announcements</TabsTrigger>
+              <TabsTrigger value="manage-announcements">Manage</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="analytics" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Resources</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <span className="text-3xl font-bold">{analytics.totalResources}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Downloads</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2">
+                      <Download className="h-5 w-5 text-accent" />
+                      <span className="text-3xl font-bold">{analytics.totalDownloads}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Views</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-5 w-5 text-success" />
+                      <span className="text-3xl font-bold">{analytics.totalViews}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Bookmarked</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2">
+                      <Bookmark className="h-5 w-5 text-warning" />
+                      <span className="text-3xl font-bold">{analytics.totalBookmarks}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Top Resources by Downloads
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {analytics.topResources.length > 0 ? (
+                    <div className="space-y-3">
+                      {analytics.topResources.map((resource: any, index: number) => (
+                        <div key={resource.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <p className="font-medium">{resource.title}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {resource.companies?.name || "General"} • {resource.round_type}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{resource.download_count || 0}</p>
+                            <p className="text-xs text-muted-foreground">downloads</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No data available yet</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="upload">
               <Card>
@@ -204,12 +388,13 @@ const MentorDashboard = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Company</Label>
+                    <Label>Select Type</Label>
                     <Select value={selectedCompany} onValueChange={setSelectedCompany}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select company" />
+                        <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="general">General Resources (Common for all)</SelectItem>
                         {companies.map((company) => (
                           <SelectItem key={company.id} value={company.id}>
                             {company.name}
@@ -219,7 +404,40 @@ const MentorDashboard = () => {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {selectedCompany === "general" && (
+                    <div className="space-y-2">
+                      <Label>Folder Path (Optional)</Label>
+                      <Input
+                        value={folderPath}
+                        onChange={(e) => setFolderPath(e.target.value)}
+                        placeholder="e.g., Communication Skills/Presentation"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use / to create nested folders. Leave empty for root folder.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedCompany === "general" && (
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select value={category} onValueChange={setCategory}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="aptitude">Aptitude</SelectItem>
+                          <SelectItem value="coding">Coding</SelectItem>
+                          <SelectItem value="communication">Communication</SelectItem>
+                          <SelectItem value="resume">Resume Building</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Resource Type</Label>
                       <Select value={resourceType} onValueChange={setResourceType}>
@@ -295,22 +513,27 @@ const MentorDashboard = () => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="my-resources">
+            <TabsContent value="resources">
               <Card>
                 <CardHeader>
-                  <CardTitle>My Uploaded Resources</CardTitle>
+                  <CardTitle>All Resources</CardTitle>
+                  <CardDescription>{resources.length} total resources</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {resources.length > 0 ? (
                     <div className="space-y-3">
                       {resources.map((resource) => (
-                        <div key={resource.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-5 w-5 text-primary" />
-                            <div>
+                        <div key={resource.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-3">
+                          <div className="flex items-start gap-3 flex-1">
+                            <FileText className="h-5 w-5 text-primary mt-1" />
+                            <div className="flex-1">
                               <p className="font-medium">{resource.title}</p>
                               <p className="text-sm text-muted-foreground">
-                                {resource.companies?.name} • {resource.round_type}
+                                {resource.companies?.name || "General Resources"} • {resource.round_type}
+                                {resource.folder_path && ` • ${resource.folder_path}`}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Downloads: {resource.download_count || 0}
                               </p>
                             </div>
                           </div>
@@ -318,6 +541,7 @@ const MentorDashboard = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteResource(resource.id)}
+                            className="shrink-0"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -332,32 +556,69 @@ const MentorDashboard = () => {
             </TabsContent>
 
             <TabsContent value="companies">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add New Company</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Company Name</Label>
-                    <Input
-                      value={newCompanyName}
-                      onChange={(e) => setNewCompanyName(e.target.value)}
-                      placeholder="e.g., Infosys"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description (Optional)</Label>
-                    <Textarea
-                      value={newCompanyDesc}
-                      onChange={(e) => setNewCompanyDesc(e.target.value)}
-                      placeholder="Brief description"
-                    />
-                  </div>
-                  <Button onClick={handleAddCompany} className="w-full gap-2">
-                    <Plus className="h-4 w-4" /> Add Company
-                  </Button>
-                </CardContent>
-              </Card>
+              <div className="grid gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Add New Company</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Company Name</Label>
+                      <Input
+                        value={newCompanyName}
+                        onChange={(e) => setNewCompanyName(e.target.value)}
+                        placeholder="e.g., Infosys"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description (Optional)</Label>
+                      <Textarea
+                        value={newCompanyDesc}
+                        onChange={(e) => setNewCompanyDesc(e.target.value)}
+                        placeholder="Brief description"
+                      />
+                    </div>
+                    <Button onClick={handleAddCompany} className="w-full gap-2">
+                      <Plus className="h-4 w-4" /> Add Company
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Manage Companies</CardTitle>
+                    <CardDescription>{companies.length} companies</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {companies.length > 0 ? (
+                      <div className="space-y-3">
+                        {companies.map((company) => (
+                          <div key={company.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <Building2 className="h-5 w-5 text-primary" />
+                              <div>
+                                <p className="font-medium">{company.name}</p>
+                                {company.description && (
+                                  <p className="text-sm text-muted-foreground">{company.description}</p>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCompany(company.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">No companies added yet</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="announcements">
@@ -390,12 +651,54 @@ const MentorDashboard = () => {
                       id="pinned"
                       checked={isPinned}
                       onChange={(e) => setIsPinned(e.target.checked)}
+                      className="rounded"
                     />
                     <Label htmlFor="pinned">Pin to top</Label>
                   </div>
                   <Button onClick={handlePostAnnouncement} className="w-full">
                     Post Announcement
                   </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="manage-announcements">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manage Announcements</CardTitle>
+                  <CardDescription>{announcements.length} announcements</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {announcements.length > 0 ? (
+                    <div className="space-y-3">
+                      {announcements.map((announcement) => (
+                        <div key={announcement.id} className="flex flex-col md:flex-row md:items-start justify-between p-4 border rounded-lg gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-medium">{announcement.title}</p>
+                              {announcement.is_pinned && (
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Pinned</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{announcement.content}</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {new Date(announcement.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteAnnouncement(announcement.id)}
+                            className="shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No announcements yet</p>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

@@ -13,6 +13,7 @@ const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [featuredCompanies, setFeaturedCompanies] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [stats, setStats] = useState({ companies: 0, resources: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,8 +41,21 @@ const Index = () => {
       .order("created_at", { ascending: false })
       .limit(5);
     
+    // Fetch stats
+    const { count: companiesCount } = await supabase
+      .from("companies")
+      .select("*", { count: "exact", head: true });
+    
+    const { count: resourcesCount } = await supabase
+      .from("resources")
+      .select("*", { count: "exact", head: true });
+    
     setFeaturedCompanies(companies || []);
     setAnnouncements(announcements || []);
+    setStats({
+      companies: companiesCount || 0,
+      resources: resourcesCount || 0,
+    });
     setLoading(false);
   };
 
@@ -84,16 +98,67 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Announcements */}
+      <section className="container mx-auto px-4 pb-16">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold mb-8">Latest Announcements</h2>
+          
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="h-6 bg-muted rounded w-1/2 mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-full"></div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : announcements.length > 0 ? (
+            <div className="space-y-4">
+              {announcements.map((announcement) => (
+                <Card key={announcement.id} className={announcement.is_pinned ? "border-primary" : ""}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2">
+                          {announcement.is_pinned && <Pin className="h-4 w-4 text-primary" />}
+                          {announcement.title}
+                        </CardTitle>
+                        <CardDescription className="mt-2">
+                          {announcement.content}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
+                      <span>Posted by {announcement.profiles?.full_name || "Admin"}</span>
+                      <span>•</span>
+                      <span>{format(new Date(announcement.created_at), "MMM dd, yyyy")}</span>
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-12">
+                <p className="text-muted-foreground">No announcements yet.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </section>
+
       {/* Stats Section */}
       <section className="container mx-auto px-4 pb-16">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           <Card className="text-center">
             <CardHeader>
               <TrendingUp className="h-10 w-10 mx-auto text-primary mb-2" />
               <CardTitle>Active Companies</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-primary">{featuredCompanies.length}+</p>
+              <p className="text-3xl font-bold text-primary">{loading ? "-" : stats.companies}</p>
             </CardContent>
           </Card>
           <Card className="text-center">
@@ -102,16 +167,7 @@ const Index = () => {
               <CardTitle>Resources</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-accent">100+</p>
-            </CardContent>
-          </Card>
-          <Card className="text-center">
-            <CardHeader>
-              <Users className="h-10 w-10 mx-auto text-success mb-2" />
-              <CardTitle>Students Helped</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-success">500+</p>
+              <p className="text-3xl font-bold text-accent">{loading ? "-" : stats.resources}</p>
             </CardContent>
           </Card>
         </div>
@@ -172,56 +228,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Announcements */}
-      <section className="container mx-auto px-4 pb-16">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold mb-8">Latest Announcements</h2>
-          
-          {loading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader>
-                    <div className="h-6 bg-muted rounded w-1/2 mb-2"></div>
-                    <div className="h-4 bg-muted rounded w-full"></div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          ) : announcements.length > 0 ? (
-            <div className="space-y-4">
-              {announcements.map((announcement) => (
-                <Card key={announcement.id} className={announcement.is_pinned ? "border-primary" : ""}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="flex items-center gap-2">
-                          {announcement.is_pinned && <Pin className="h-4 w-4 text-primary" />}
-                          {announcement.title}
-                        </CardTitle>
-                        <CardDescription className="mt-2">
-                          {announcement.content}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4">
-                      <span>Posted by {announcement.profiles?.full_name || "Admin"}</span>
-                      <span>•</span>
-                      <span>{format(new Date(announcement.created_at), "MMM dd, yyyy")}</span>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="text-center py-12">
-                <p className="text-muted-foreground">No announcements yet.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </section>
 
       {/* Getting Started Guide */}
       <section className="container mx-auto px-4 pb-16">

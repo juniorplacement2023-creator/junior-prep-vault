@@ -10,6 +10,7 @@ import Companies from "./pages/Companies";
 import CompanyDetail from "./pages/CompanyDetail";
 import MentorDashboard from "./pages/MentorDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import GeneralResources from "./pages/GeneralResources";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/company/:id" element={<CompanyDetail />} />
+            <Route path="/general-resources" element={<GeneralResources />} />
             <Route path="/mentor/dashboard" element={<MentorDashboard />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
