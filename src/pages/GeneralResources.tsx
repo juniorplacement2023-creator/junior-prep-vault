@@ -87,10 +87,6 @@ const GeneralResources = () => {
       user_id: user?.id,
       action: "view",
     });
-    await supabase
-      .from("resources")
-      .update({ view_count: (resource.view_count || 0) + 1 })
-      .eq("id", resource.id);
     setViewerResource(resource);
     setViewerOpen(true);
   };

@@ -134,12 +134,6 @@ const CompanyDetail = () => {
       user_id: user?.id,
       action: "view",
     });
-
-    // Increment view count (if column exists)
-    await supabase
-      .from("resources")
-      .update({ view_count: (resource.view_count || 0) + 1 })
-      .eq("id", resource.id);
     setViewerResource(resource);
     setViewerOpen(true);
   };
