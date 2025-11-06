@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Send, Trash2 } from "lucide-react";
 
 interface ForumPost {
   id: string;
@@ -34,10 +34,22 @@ const Forum = () => {
   const [newContent, setNewContent] = useState("");
   const [replyTextByPost, setReplyTextByPost] = useState<Record<string, string>>({});
   const [rolesByUserId, setRolesByUserId] = useState<Record<string, string>>({});
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPosts();
-  }, []);
+    fetchUserRole();
+  }, [user]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+    setUserRole(data?.role || null);
+  };
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -83,9 +95,37 @@ const Forum = () => {
   };
 
   const roleLabel = (userId?: string) => {
-    if (!userId) return "Student";
+    if (!userId) return "(Student)";
     const role = rolesByUserId[userId];
-    return role === "mentor" ? "Mentor" : "Student"; // juniors/students -> Student
+    return role === "mentor" ? "(Mentor)" : "(Student)";
+  };
+
+  const isMentorOrAdmin = userRole === "mentor" || userRole === "admin";
+
+  const handleDeletePost = async (postId: string) => {
+    const { error } = await supabase
+      .from("forum_posts")
+      .delete()
+      .eq("id", postId);
+    if (error) {
+      toast.error("Failed to delete post");
+      return;
+    }
+    toast.success("Post deleted");
+    fetchPosts();
+  };
+
+  const handleDeleteReply = async (replyId: string) => {
+    const { error } = await supabase
+      .from("forum_replies")
+      .delete()
+      .eq("id", replyId);
+    if (error) {
+      toast.error("Failed to delete reply");
+      return;
+    }
+    toast.success("Reply deleted");
+    fetchPosts();
   };
 
   const handleCreatePost = async () => {
@@ -188,12 +228,21 @@ const Forum = () => {
                     <CardDescription className="text-justify">
                       {post.content}
                     </CardDescription>
-                    <div className="text-sm text-muted-foreground mt-2">
-                      <span className="font-medium">{post.profiles?.full_name || "User"}</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {roleLabel(post.author_id)}
-                      </Badge>
-                      <span className="ml-2">• {new Date(post.created_at).toLocaleString()}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground mt-2">
+                        <span className="font-medium">{post.profiles?.full_name || "User"} {roleLabel(post.author_id)}</span>
+                        <span className="ml-2">• {new Date(post.created_at).toLocaleString()}</span>
+                      </div>
+                      {isMentorOrAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeletePost(post.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -207,12 +256,21 @@ const Forum = () => {
                         {post.replies.map((reply) => (
                           <div key={reply.id} className="p-3 rounded-md border">
                             <p className="text-sm text-justify">{reply.content}</p>
-                            <div className="text-xs text-muted-foreground mt-2">
-                              <span className="font-medium">{reply.profiles?.full_name || "User"}</span>
-                              <Badge variant="outline" className="ml-2">
-                                {roleLabel(reply.author_id)}
-                              </Badge>
-                              <span className="ml-2">• {new Date(reply.created_at).toLocaleString()}</span>
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-medium">{reply.profiles?.full_name || "User"} {roleLabel(reply.author_id)}</span>
+                                <span className="ml-2">• {new Date(reply.created_at).toLocaleString()}</span>
+                              </div>
+                              {isMentorOrAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteReply(reply.id)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ))}
