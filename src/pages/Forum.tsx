@@ -39,6 +39,68 @@ const Forum = () => {
   useEffect(() => {
     fetchPosts();
     fetchUserRole();
+
+    // Set up realtime subscriptions
+    const postsChannel = supabase
+      .channel('forum-posts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'forum_posts'
+        },
+        () => {
+          console.log('New post detected, refreshing...');
+          fetchPosts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'forum_posts'
+        },
+        () => {
+          console.log('Post deleted, refreshing...');
+          fetchPosts();
+        }
+      )
+      .subscribe();
+
+    const repliesChannel = supabase
+      .channel('forum-replies-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'forum_replies'
+        },
+        () => {
+          console.log('New reply detected, refreshing...');
+          fetchPosts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'forum_replies'
+        },
+        () => {
+          console.log('Reply deleted, refreshing...');
+          fetchPosts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postsChannel);
+      supabase.removeChannel(repliesChannel);
+    };
   }, [user]);
 
   const fetchUserRole = async () => {
