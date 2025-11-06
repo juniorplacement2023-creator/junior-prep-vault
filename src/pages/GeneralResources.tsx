@@ -16,6 +16,7 @@ const GeneralResources = () => {
   const { user } = useAuth();
   const [resources, setResources] = useState<any[]>([]);
   const [folders, setFolders] = useState<FolderStructure>({});
+  const [folderCounts, setFolderCounts] = useState<Record<string, number>>({});
   const [currentPath, setCurrentPath] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -23,6 +24,19 @@ const GeneralResources = () => {
 
   useEffect(() => {
     fetchGeneralResources();
+    const channel = supabase
+      .channel('general-resources-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'resources', filter: 'company_id=is.null' },
+        () => {
+          fetchGeneralResources();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchGeneralResources = async () => {
@@ -42,6 +56,7 @@ const GeneralResources = () => {
 
   const organizeFolders = (data: any[]) => {
     const folderMap: FolderStructure = {};
+    const counts: Record<string, number> = {};
     
     data.forEach((resource) => {
       const path = resource.folder_path || "root";
@@ -49,9 +64,17 @@ const GeneralResources = () => {
         folderMap[path] = [];
       }
       folderMap[path].push(resource);
+
+      // Increment count for this folder and all its ancestors
+      const parts = path === "root" ? ["root"] : path.split("/");
+      for (let i = 1; i <= parts.length; i++) {
+        const ancestor = path === "root" ? "root" : parts.slice(0, i).join("/");
+        counts[ancestor] = (counts[ancestor] || 0) + 1;
+      }
     });
 
     setFolders(folderMap);
+    setFolderCounts(counts);
   };
 
   const handleDownload = async (resource: any) => {
@@ -144,7 +167,7 @@ const GeneralResources = () => {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-4">General Resources</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold mb-4">General Resources</h1>
             <p className="text-muted-foreground">
               Common study materials and preparation resources for all placements
             </p>
@@ -168,7 +191,7 @@ const GeneralResources = () => {
 
           {/* Folders */}
           {currentFolders.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
               {currentFolders.map((folderPath) => (
                 <Card
                   key={folderPath}
@@ -176,12 +199,20 @@ const GeneralResources = () => {
                   onClick={() => setCurrentPath(folderPath)}
                 >
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Folder className="h-5 w-5 text-primary" />
-                      {folderPath.split("/").pop()}
+                    <CardTitle className="flex items-center gap-2 min-w-0">
+                      <Folder className="h-5 w-5 text-primary shrink-0" />
+                      {(() => {
+                        const name = folderPath.split("/").pop() as string;
+                        const nameClass = name.length > 18 ? "text-xs sm:text-sm" : "text-sm sm:text-base";
+                        return (
+                          <span className={`truncate ${nameClass}`} title={name}>
+                            {name}
+                          </span>
+                        );
+                      })()}
                     </CardTitle>
                     <CardDescription>
-                      {folders[folderPath]?.length || 0} resources
+                      {folderCounts[folderPath] || 0} resources
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -193,17 +224,17 @@ const GeneralResources = () => {
           {loading ? (
             <div className="text-center py-12">Loading...</div>
           ) : currentResources.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
               {currentResources.map((resource) => (
                 <Card key={resource.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <CardTitle className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-primary" />
-                          {resource.title}
+                        <CardTitle className="flex items-center gap-2 min-w-0 text-base sm:text-lg">
+                          <FileText className="h-5 w-5 text-primary shrink-0" />
+                          <span className="truncate" title={resource.title}>{resource.title}</span>
                         </CardTitle>
-                        <CardDescription className="mt-2 text-justify">
+                        <CardDescription className="mt-2 text-justify text-sm sm:text-base">
                           {resource.description}
                         </CardDescription>
                         <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
@@ -254,6 +285,8 @@ const GeneralResources = () => {
                 </Card>
               ))}
             </div>
+          ) : currentFolders.length > 0 ? (
+            <></>
           ) : (
             <Card>
               <CardContent className="text-center py-12">

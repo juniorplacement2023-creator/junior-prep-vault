@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Upload, Plus, FileText, Trash2, Building2, BarChart3, TrendingUp, Download, Eye, Bookmark, Folder, FolderPlus } from "lucide-react";
+import { Upload, Plus, FileText, Trash2, Building2, TrendingUp, Download, Eye, Bookmark, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const MentorDashboard = () => {
   const { user, userRole, loading: authLoading } = useAuth();
@@ -41,7 +42,14 @@ const MentorDashboard = () => {
   const [category, setCategory] = useState("general");
   const [folderPath, setFolderPath] = useState("");
   const [externalLink, setExternalLink] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  // Edit resource dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingResource, setEditingResource] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editRound, setEditRound] = useState("general");
+  const [editType, setEditType] = useState("pdf");
+  const [editExternalLink, setEditExternalLink] = useState("");
 
   // Announcement form
   const [announcementTitle, setAnnouncementTitle] = useState("");
@@ -241,15 +249,66 @@ const MentorDashboard = () => {
   const handleDeleteResource = async (id: string) => {
     if (!confirm("Are you sure you want to delete this resource?")) return;
 
+    const { data: resRow } = await supabase
+      .from("resources")
+      .select("file_path")
+      .eq("id", id)
+      .single();
+
     const { error } = await supabase.from("resources").delete().eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete resource");
-    } else {
-      toast.success("Resource deleted");
-      fetchData();
-      fetchAnalytics();
+      toast.error(error.message || "Failed to delete resource");
+      return;
     }
+
+    // Optimistically update UI immediately after DB deletion
+    setResources((prev) => prev.filter((r: any) => r.id !== id));
+    setAnalytics((prev: any) => ({
+      ...prev,
+      totalResources: Math.max(0, (prev.totalResources || 0) - 1),
+    }));
+
+    if (resRow?.file_path) {
+      try { await supabase.storage.from("resources").remove([resRow.file_path]); } catch {}
+    }
+
+    toast.success("Resource deleted");
+    fetchAnalytics();
+  };
+
+  const openEdit = (resource: any) => {
+    setEditingResource(resource);
+    setEditTitle(resource.title || "");
+    setEditDesc(resource.description || "");
+    setEditRound(resource.round_type || "general");
+    setEditType(resource.resource_type || "pdf");
+    setEditExternalLink(resource.external_link || "");
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editingResource) return;
+    const { error } = await supabase
+      .from("resources")
+      .update({
+        title: editTitle.trim(),
+        description: editDesc.trim(),
+        round_type: editRound as any,
+        resource_type: editType as any,
+        external_link: editExternalLink.trim() || null,
+      })
+      .eq("id", editingResource.id);
+
+    if (error) {
+      toast.error(error.message || "Failed to update resource");
+      return;
+    }
+    toast.success("Resource updated");
+    setEditOpen(false);
+    setEditingResource(null);
+    fetchData();
+    fetchAnalytics();
   };
 
   const handlePostAnnouncement = async () => {
@@ -294,6 +353,7 @@ const MentorDashboard = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <Navbar />
       
@@ -558,14 +618,24 @@ const MentorDashboard = () => {
                               </p>
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteResource(resource.id)}
-                            className="shrink-0"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(resource)}
+                              className="shrink-0"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteResource(resource.id)}
+                              className="shrink-0"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -727,6 +797,64 @@ const MentorDashboard = () => {
         </div>
       </div>
     </div>
+    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Resource</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Title</Label>
+            <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Description</Label>
+            <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Round Type</Label>
+              <Select value={editRound} onValueChange={setEditRound}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="aptitude">Aptitude</SelectItem>
+                  <SelectItem value="coding">Coding</SelectItem>
+                  <SelectItem value="technical">Technical</SelectItem>
+                  <SelectItem value="hr">HR</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Resource Type</Label>
+              <Select value={editType} onValueChange={setEditType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="doc">Document</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="link">Link</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>External Link (optional)</Label>
+            <Input value={editExternalLink} onChange={(e) => setEditExternalLink(e.target.value)} placeholder="https://..." />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button onClick={saveEdit}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
