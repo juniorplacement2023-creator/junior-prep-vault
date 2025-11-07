@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { GraduationCap, LogOut, User, Home, Building2, LayoutDashboard } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
+import { GraduationCap, LogOut, User, Home, Building2, LayoutDashboard, Moon, Sun } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 export const Navbar = () => {
   const { user, userRole, signOut } = useAuth();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   return (
     <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 animate-slide-up">
@@ -50,6 +52,15 @@ export const Navbar = () => {
                 General Resources
               </Button>
             </Link>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              className="transition-all hover:scale-105"
+            >
+              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </Button>
 
             {user ? (
               <DropdownMenu>

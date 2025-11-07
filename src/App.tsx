@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { RouteTransition } from "@/components/RouteTransition";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Companies from "./pages/Companies";
@@ -39,21 +41,24 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
-            <Route path="/company/:id" element={<ProtectedRoute><CompanyDetail /></ProtectedRoute>} />
-            <Route path="/general-resources" element={<ProtectedRoute><GeneralResources /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
-            <Route path="/mentor/dashboard" element={<ProtectedRoute><MentorDashboard /></ProtectedRoute>} />
-            <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
-          </Routes>
-        </AuthProvider>
+        <ThemeProvider defaultTheme="light">
+          <AuthProvider>
+            <RouteTransition>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
+                <Route path="/company/:id" element={<ProtectedRoute><CompanyDetail /></ProtectedRoute>} />
+                <Route path="/general-resources" element={<ProtectedRoute><GeneralResources /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+                <Route path="/mentor/dashboard" element={<ProtectedRoute><MentorDashboard /></ProtectedRoute>} />
+                <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+                <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
+              </Routes>
+            </RouteTransition>
+          </AuthProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

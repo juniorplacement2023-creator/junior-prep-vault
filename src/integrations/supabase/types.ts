@@ -195,6 +195,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          is_active: boolean
           updated_at: string | null
         }
         Insert: {
@@ -202,6 +203,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          is_active?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -209,6 +211,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          is_active?: boolean
           updated_at?: string | null
         }
         Relationships: []
@@ -352,6 +355,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_user_active: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "mentor" | "junior"
