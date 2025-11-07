@@ -16,12 +16,12 @@ export const Navbar = () => {
   const navigate = useNavigate();
 
   return (
-    <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <nav className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 animate-slide-up">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <GraduationCap className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+          <Link to="/" className="flex items-center gap-2 group">
+            <GraduationCap className="h-8 w-8 text-primary transition-transform group-hover:rotate-12" />
+            <span className="text-xl font-bold gradient-text">
               PlacementSphere
             </span>
           </Link>
@@ -29,24 +29,24 @@ export const Navbar = () => {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-4">
             <Link to="/">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="transition-all hover:scale-105">
                 <Home className="h-4 w-4 mr-2" />
                 Home
               </Button>
             </Link>
             <Link to="/companies">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="transition-all hover:scale-105">
                 <Building2 className="h-4 w-4 mr-2" />
                 Companies
               </Button>
             </Link>
             <Link to="/forum">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="transition-all hover:scale-105">
                 Forum
               </Button>
             </Link>
             <Link to="/general-resources">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="transition-all hover:scale-105">
                 General Resources
               </Button>
             </Link>

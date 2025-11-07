@@ -86,12 +86,17 @@ const Companies = () => {
             </div>
           ) : filteredCompanies.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCompanies.map((company) => (
-                <Link key={company.id} to={`/company/${company.id}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+              {filteredCompanies.map((company, index) => (
+                <Link 
+                  key={company.id} 
+                  to={`/company/${company.id}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className="animate-fade-in"
+                >
+                  <Card className="hover-lift hover-glow transition-all duration-300 cursor-pointer h-full border-2 hover:border-primary/50">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <Building2 className="h-5 w-5 text-primary" />
+                        <Building2 className="h-5 w-5 text-primary transition-transform group-hover:scale-110" />
                         {company.name}
                       </CardTitle>
                       <CardDescription className="line-clamp-3">
@@ -99,9 +104,9 @@ const Companies = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <Button variant="ghost" className="w-full gap-2">
+                      <Button variant="ghost" className="w-full gap-2 group">
                         View Resources
-                        <ArrowRight className="h-4 w-4" />
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </Button>
                     </CardContent>
                   </Card>

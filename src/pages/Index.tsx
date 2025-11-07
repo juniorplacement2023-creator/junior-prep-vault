@@ -72,26 +72,26 @@ const Index = () => {
       
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <h1 className="text-5xl font-bold tracking-tight">
+        <div className="max-w-4xl mx-auto text-center space-y-6 animate-fade-in">
+          <h1 className="text-5xl font-bold tracking-tight animate-slide-up">
             Welcome to{" "}
-            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <span className="gradient-text">
               PlacementSphere
             </span>
           </h1>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-xl text-muted-foreground animate-slide-up" style={{ animationDelay: '0.1s' }}>
             Campus Recruitment Resource Portal for Batch 2027
           </p>
           
-          <div className="flex gap-2 max-w-xl mx-auto mt-8">
+          <div className="flex gap-2 max-w-xl mx-auto mt-8 animate-slide-up" style={{ animationDelay: '0.2s' }}>
             <Input
               placeholder="Search companies, resources, or topics..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="h-12"
+              className="h-12 transition-all focus:scale-[1.02]"
             />
-            <Button onClick={handleSearch} size="lg" className="gap-2">
+            <Button onClick={handleSearch} size="lg" className="gap-2 hover-scale">
               <Search className="h-4 w-4" />
               Search
             </Button>

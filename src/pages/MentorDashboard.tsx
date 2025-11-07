@@ -30,6 +30,7 @@ const MentorDashboard = () => {
     downloadsByResource: {}
   });
   const [uploading, setUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
   // Form states
   const [newCompanyName, setNewCompanyName] = useState("");
@@ -249,32 +250,99 @@ const MentorDashboard = () => {
   const handleDeleteResource = async (id: string) => {
     if (!confirm("Are you sure you want to delete this resource?")) return;
 
-    const { data: resRow } = await supabase
-      .from("resources")
-      .select("file_path")
-      .eq("id", id)
-      .single();
+    try {
+      // Get the resource details first
+      const { data: resRow } = await supabase
+        .from("resources")
+        .select("file_path")
+        .eq("id", id)
+        .single();
 
-    const { error } = await supabase.from("resources").delete().eq("id", id);
+      // Delete from database first
+      const { error: dbError } = await supabase.from("resources").delete().eq("id", id);
 
-    if (error) {
+      if (dbError) {
+        toast.error(dbError.message || "Failed to delete resource");
+        return;
+      }
+
+      // Delete from storage if file exists
+      if (resRow?.file_path) {
+        const { error: storageError } = await supabase.storage
+          .from("resources")
+          .remove([resRow.file_path]);
+        
+        if (storageError) {
+          console.error("Storage deletion error:", storageError);
+          // Don't show error to user as DB record is already deleted
+        }
+      }
+
+      // Update UI
+      setResources((prev) => prev.filter((r: any) => r.id !== id));
+      setAnalytics((prev: any) => ({
+        ...prev,
+        totalResources: Math.max(0, (prev.totalResources || 0) - 1),
+      }));
+
+      toast.success("Resource deleted successfully");
+      fetchAnalytics();
+    } catch (error: any) {
       toast.error(error.message || "Failed to delete resource");
-      return;
     }
+  };
 
-    // Optimistically update UI immediately after DB deletion
-    setResources((prev) => prev.filter((r: any) => r.id !== id));
-    setAnalytics((prev: any) => ({
-      ...prev,
-      totalResources: Math.max(0, (prev.totalResources || 0) - 1),
-    }));
+  const handleDeleteFolder = async (folderPath: string) => {
+    if (!confirm(`Are you sure you want to delete all resources in "${folderPath}"?`)) return;
 
-    if (resRow?.file_path) {
-      try { await supabase.storage.from("resources").remove([resRow.file_path]); } catch {}
+    try {
+      // Get all resources in this folder
+      const { data: folderResources, error: fetchError } = await supabase
+        .from("resources")
+        .select("id, file_path")
+        .eq("folder_path", folderPath);
+
+      if (fetchError) throw fetchError;
+
+      if (!folderResources || folderResources.length === 0) {
+        toast.error("No resources found in this folder");
+        return;
+      }
+
+      // Delete all resources from database
+      const { error: dbError } = await supabase
+        .from("resources")
+        .delete()
+        .eq("folder_path", folderPath);
+
+      if (dbError) throw dbError;
+
+      // Delete all files from storage
+      const filePaths = folderResources
+        .map(r => r.file_path)
+        .filter(Boolean) as string[];
+
+      if (filePaths.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from("resources")
+          .remove(filePaths);
+        
+        if (storageError) {
+          console.error("Storage deletion error:", storageError);
+        }
+      }
+
+      // Update UI
+      setResources((prev) => 
+        prev.filter((r: any) => r.folder_path !== folderPath)
+      );
+
+      toast.success(`Deleted ${folderResources.length} resources from "${folderPath}"`);
+      fetchData();
+      fetchAnalytics();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete folder");
     }
-
-    toast.success("Resource deleted");
-    fetchAnalytics();
   };
 
   const openEdit = (resource: any) => {
@@ -603,41 +671,72 @@ const MentorDashboard = () => {
                 <CardContent>
                   {resources.length > 0 ? (
                     <div className="space-y-3">
-                      {resources.map((resource) => (
-                        <div key={resource.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-3">
-                          <div className="flex items-start gap-3 flex-1">
-                            <FileText className="h-5 w-5 text-primary mt-1" />
-                            <div className="flex-1">
-                              <p className="font-medium">{resource.title}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {resource.companies?.name || "General Resources"} • {resource.round_type}
-                                {resource.folder_path && ` • ${resource.folder_path}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Downloads: {analytics.downloadsByResource?.[resource.id] ?? resource.download_count ?? 0}
-                              </p>
-                            </div>
+                      {/* Group resources by folder */}
+                      {(() => {
+                        const folders = new Map<string, typeof resources>();
+                        resources.forEach(r => {
+                          const folder = r.folder_path || "_root";
+                          if (!folders.has(folder)) folders.set(folder, []);
+                          folders.get(folder)?.push(r);
+                        });
+
+                        return Array.from(folders.entries()).map(([folder, folderResources]) => (
+                          <div key={folder} className="space-y-2 animate-fade-in">
+                            {folder !== "_root" && (
+                              <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-md">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-primary" />
+                                  <span className="font-medium text-sm">{folder}</span>
+                                  <span className="text-xs text-muted-foreground">({folderResources.length})</span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteFolder(folder)}
+                                  className="h-7 text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                  Delete Folder
+                                </Button>
+                              </div>
+                            )}
+                            {folderResources.map((resource) => (
+                              <div key={resource.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-3 hover-scale transition-all duration-300">
+                                <div className="flex items-start gap-3 flex-1">
+                                  <FileText className="h-5 w-5 text-primary mt-1" />
+                                  <div className="flex-1">
+                                    <p className="font-medium">{resource.title}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {resource.companies?.name || "General Resources"} • {resource.round_type}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Downloads: {analytics.downloadsByResource?.[resource.id] ?? resource.download_count ?? 0}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEdit(resource)}
+                                    className="shrink-0 transition-transform hover:scale-110"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteResource(resource.id)}
+                                    className="shrink-0 transition-transform hover:scale-110"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEdit(resource)}
-                              className="shrink-0"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteResource(resource.id)}
-                              className="shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   ) : (
                     <p className="text-center text-muted-foreground py-8">No resources uploaded yet</p>
