@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { GraduationCap, Loader2 } from "lucide-react";
 import { z } from "zod";
+import { getAppUrl } from "@/lib/utils";
 
 const authSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -57,11 +58,14 @@ const Auth = () => {
 
     setLoading(true);
 
+    // Get the app URL for email redirect
+    const redirectUrl = getAppUrl();
+    
     const { error } = await supabase.auth.signUp({
       email: studentEmail,
       password: studentPassword,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${redirectUrl}/`,
         data: {
           full_name: studentFullName,
         },
