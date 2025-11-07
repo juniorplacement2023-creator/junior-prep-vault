@@ -7,9 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -21,7 +18,6 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedRole, setSelectedRole] = useState("junior");
-  const [loadingUsers, setLoadingUsers] = useState(true);
 
   useEffect(() => {
     if (!authLoading && (!user || userRole !== "admin")) {
@@ -37,7 +33,6 @@ const AdminDashboard = () => {
   }, [user, userRole]);
 
   const fetchUsers = async () => {
-    setLoadingUsers(true);
     const { data } = await supabase
       .from("profiles")
       .select(`
@@ -47,7 +42,6 @@ const AdminDashboard = () => {
       .order("created_at", { ascending: false });
 
     setUsers(data || []);
-    setLoadingUsers(false);
   };
 
   const handleAssignRole = async () => {
@@ -91,30 +85,8 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleToggleActive = async (userId: string, currentStatus: boolean) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_active: !currentStatus })
-      .eq("id", userId);
-
-    if (error) {
-      toast.error("Failed to update account status");
-    } else {
-      toast.success(`Account ${!currentStatus ? "activated" : "deactivated"}`);
-      fetchUsers();
-    }
-  };
-
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <Navbar />
-        <div className="container mx-auto px-4 py-12">
-          <Skeleton className="h-10 w-64 mb-8" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   return (
@@ -138,61 +110,39 @@ const AdminDashboard = () => {
                     <Users className="h-5 w-5" />
                     All Users
                   </CardTitle>
-                  <CardDescription>Manage user roles and account status</CardDescription>
+                  <CardDescription>Manage user roles and permissions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loadingUsers ? (
+                  {users.length > 0 ? (
                     <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-20 w-full" />
+                      {users.map((user) => (
+                        <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{user.full_name}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <div className="flex gap-2 mt-2">
+                              {user.user_roles?.map((ur: any, idx: number) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded capitalize">
+                                    {ur.role}
+                                  </span>
+                                  {ur.role !== "junior" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => handleRemoveRole(user.id, ur.role)}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       ))}
                     </div>
-                  ) : users.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Account Active</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.full_name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2 flex-wrap">
-                                {user.user_roles?.map((ur: any, idx: number) => (
-                                  <div key={idx} className="flex items-center gap-1">
-                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded capitalize">
-                                      {ur.role}
-                                    </span>
-                                    {ur.role !== "junior" && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => handleRemoveRole(user.id, ur.role)}
-                                      >
-                                        <Trash2 className="h-3 w-3 text-destructive" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Switch
-                                checked={user.is_active}
-                                onCheckedChange={() => handleToggleActive(user.id, user.is_active)}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
                   ) : (
                     <p className="text-center text-muted-foreground py-8">No users found</p>
                   )}

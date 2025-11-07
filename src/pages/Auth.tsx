@@ -40,12 +40,6 @@ const Auth = () => {
   const handleStudentSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate email domain
-    if (!studentEmail.endsWith("@rajalakshmi.edu.in")) {
-      toast.error("Only @rajalakshmi.edu.in email addresses are allowed");
-      return;
-    }
-    
     try {
       authSchema.parse({ email: studentEmail, password: studentPassword, fullName: studentFullName });
     } catch (error) {
@@ -73,7 +67,7 @@ const Auth = () => {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Check your email for OTP verification!");
+      toast.success("Account created successfully! Please sign in.");
       setActiveTab("student");
     }
   };
@@ -104,23 +98,11 @@ const Auth = () => {
       return;
     }
 
-    // Check if user is active
+    // Post-login role guard: block mentors/admins from using student sign-in
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) {
       toast.error("Unable to verify user. Please try again.");
-      await supabase.auth.signOut();
-      return;
-    }
-
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_active")
-      .eq("id", userId)
-      .single();
-
-    if (profileError || !profileData?.is_active) {
-      toast.error("Your account has been deactivated. Please contact admin.");
       await supabase.auth.signOut();
       return;
     }
