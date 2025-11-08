@@ -61,7 +61,7 @@ const Auth = () => {
       email: studentEmail,
       password: studentPassword,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: "https://placement-sphere.vercel.app/",
         data: {
           full_name: studentFullName,
         },

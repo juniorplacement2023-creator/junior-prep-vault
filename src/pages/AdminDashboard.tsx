@@ -107,12 +107,8 @@ const AdminDashboard = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <Navbar />
-        <div className="container mx-auto px-4 py-12">
-          <Skeleton className="h-10 w-64 mb-8" />
-          <Skeleton className="h-96 w-full" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
       </div>
     );
   }
@@ -140,14 +136,8 @@ const AdminDashboard = () => {
                   </CardTitle>
                   <CardDescription>Manage user roles and account status</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {loadingUsers ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-20 w-full" />
-                      ))}
-                    </div>
-                  ) : users.length > 0 ? (
+                 <CardContent>
+                  {users.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
