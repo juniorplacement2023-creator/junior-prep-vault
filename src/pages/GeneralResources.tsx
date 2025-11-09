@@ -24,16 +24,25 @@ const GeneralResources = () => {
 
   useEffect(() => {
     fetchGeneralResources();
+    
+    // Set up real-time subscription for any changes to general resources
     const channel = supabase
       .channel('general-resources-changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'resources', filter: 'company_id=is.null' },
-        () => {
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'resources'
+        },
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          // Refetch all resources to ensure folder structure is updated
           fetchGeneralResources();
         }
       )
       .subscribe();
+      
     return () => {
       supabase.removeChannel(channel);
     };
@@ -58,7 +67,10 @@ const GeneralResources = () => {
     const folderMap: FolderStructure = {};
     const counts: Record<string, number> = {};
     
-    data.forEach((resource) => {
+    // Only process general resources (company_id is null)
+    const generalResources = data.filter(r => r.company_id === null);
+    
+    generalResources.forEach((resource) => {
       const path = resource.folder_path || "root";
       if (!folderMap[path]) {
         folderMap[path] = [];
@@ -72,6 +84,9 @@ const GeneralResources = () => {
         counts[ancestor] = (counts[ancestor] || 0) + 1;
       }
     });
+
+    console.log('Organized folders:', folderMap);
+    console.log('Folder counts:', counts);
 
     setFolders(folderMap);
     setFolderCounts(counts);
