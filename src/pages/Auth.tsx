@@ -61,21 +61,45 @@ const Auth = () => {
       email: studentEmail,
       password: studentPassword,
       options: {
-        emailRedirectTo: "https://placement-sphere.vercel.app/",
+        emailRedirectTo: `${window.location.origin}/`,
         data: {
           full_name: studentFullName,
         },
       },
     });
 
-    setLoading(false);
-
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("Check your email for OTP verification!");
-      setActiveTab("student");
+      setLoading(false);
+      return;
     }
+
+    // Send verification email via our edge function
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const verificationLink = `${window.location.origin}/auth?verify=true`;
+        
+        await supabase.functions.invoke('send-verification-email', {
+          body: {
+            email: studentEmail,
+            fullName: studentFullName,
+            verificationLink: verificationLink,
+          },
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      // Continue even if email fails
+    }
+
+    toast.success("Account created successfully! Please check your email from PlacementSphere to verify your account!");
+    
+    // Clear form
+    setStudentEmail("");
+    setStudentPassword("");
+    setStudentFullName("");
+    setLoading(false);
   };
 
   const handleStudentSignIn = async (e: React.FormEvent) => {
