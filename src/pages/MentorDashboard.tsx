@@ -251,23 +251,37 @@ const MentorDashboard = () => {
     if (!confirm("Are you sure you want to delete this resource?")) return;
 
     try {
+      console.log("Deleting resource:", id);
+      
       // Get the resource details first
-      const { data: resRow } = await supabase
+      const { data: resRow, error: fetchError } = await supabase
         .from("resources")
         .select("file_path")
         .eq("id", id)
         .single();
 
+      if (fetchError) {
+        console.error("Error fetching resource:", fetchError);
+        toast.error(fetchError.message || "Failed to fetch resource");
+        return;
+      }
+
+      console.log("Resource to delete:", resRow);
+
       // Delete from database first
       const { error: dbError } = await supabase.from("resources").delete().eq("id", id);
 
       if (dbError) {
+        console.error("Database deletion error:", dbError);
         toast.error(dbError.message || "Failed to delete resource");
         return;
       }
 
+      console.log("Database deletion successful");
+
       // Delete from storage if file exists
       if (resRow?.file_path) {
+        console.log("Deleting file from storage:", resRow.file_path);
         const { error: storageError } = await supabase.storage
           .from("resources")
           .remove([resRow.file_path]);
@@ -275,6 +289,8 @@ const MentorDashboard = () => {
         if (storageError) {
           console.error("Storage deletion error:", storageError);
           // Don't show error to user as DB record is already deleted
+        } else {
+          console.log("Storage deletion successful");
         }
       }
 
@@ -288,6 +304,7 @@ const MentorDashboard = () => {
       toast.success("Resource deleted successfully");
       fetchAnalytics();
     } catch (error: any) {
+      console.error("Unexpected error during deletion:", error);
       toast.error(error.message || "Failed to delete resource");
     }
   };
